@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { LayoutGrid, Menu, Plus, X } from "lucide-react"
+import { LayoutGrid, Menu, Plus, Trash2, X } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { useBoardStore } from "@/stores/board-store"
 
@@ -15,6 +15,7 @@ const Page = () => {
 
   const boards = useBoardStore((state) => state.boards)
   const createBoard = useBoardStore((state) => state.createBoard)
+  const deleteBoard = useBoardStore((state) => state.deleteBoard)
   const boardList = Object.values(boards)
 
   const closeSidebar = () => setSidebarOpen(false)
@@ -214,24 +215,48 @@ const Page = () => {
               </button>
             </section>
           ) : (
+            // display boards
             <section
               aria-label='Your boards'
               className='mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3'
             >
               {boardList.map((board) => (
-                <Link
+                <article
                   key={board.id}
-                  href={`/boards/${board.id}`}
-                  className='rounded-xl border border-border bg-white p-5 transition-colors hover:border-teal-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700'
+                  className='rounded-xl border border-border bg-white p-5 transition-colors hover:border-teal-600'
                 >
-                  <h2 className='truncate font-semibold'>{board.title}</h2>
-                  <p className='mt-2 line-clamp-3 min-h-12 text-sm leading-6 text-muted'>
-                    {board.description || "No description"}
-                  </p>
-                  <p className='mt-4 text-xs text-muted'>
-                    Created {new Date(board.createdAt).toLocaleDateString()}
-                  </p>
-                </Link>
+                  <div className='flex items-start justify-between gap-3'>
+                    <Link
+                      href={`/boards/${board.id}`}
+                      className='min-w-0 flex-1 rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700'
+                    >
+                      <h2 className='truncate font-semibold'>{board.title}</h2>
+                      <p className='mt-2 line-clamp-3 min-h-12 text-sm leading-6 text-muted'>
+                        {board.description || "No description"}
+                      </p>
+                      <p className='mt-4 text-xs text-muted'>
+                        Created {new Date(board.createdAt).toLocaleDateString()}
+                      </p>
+                    </Link>
+
+                    <button
+                      type='button'
+                      aria-label={`Delete ${board.title}`}
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            `Delete "${board.title}"? This cannot be undone.`,
+                          )
+                        ) {
+                          deleteBoard(board.id)
+                        }
+                      }}
+                      className='shrink-0 rounded-lg p-2  text-red-400 hover:bg-red-50 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700'
+                    >
+                      <Trash2 size={18} aria-hidden='true' />
+                    </button>
+                  </div>
+                </article>
               ))}
             </section>
           )}
