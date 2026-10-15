@@ -2,7 +2,13 @@
 
 import Link from "next/link"
 import { LayoutGrid, Menu, Plus, Trash2, X, Pencil } from "lucide-react"
-import { useEffect, useRef, useState, type FormEvent } from "react"
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react"
 import { useAlerts } from "@/components/ui/alert-provider"
 import { useBoardStore } from "@/stores/board-store"
 
@@ -21,6 +27,8 @@ const Page = () => {
 
   const createButtonRef = useRef<HTMLButtonElement>(null)
   const titleInputRef = useRef<HTMLInputElement>(null)
+  const dialogRef = useRef<HTMLElement>(null)
+  const dialogTriggerRef = useRef<HTMLElement | null>(null)
 
   const boardList = Object.values(boards).sort(
     (first, second) =>
@@ -31,12 +39,13 @@ const Page = () => {
   const isEditing = editingBoardId !== null
 
   useEffect(() => {
-    if (dialogOpen) {
-      titleInputRef.current?.focus()
-    }
+    if (!dialogOpen) return
+
+    titleInputRef.current?.focus()
   }, [dialogOpen])
 
   const openCreateDialog = () => {
+    dialogTriggerRef.current = document.activeElement as HTMLElement | null
     setEditingBoardId(null)
     setTitle("")
     setDescription("")
@@ -47,7 +56,9 @@ const Page = () => {
     boardId: string,
     boardTitle: string,
     boardDescription: string,
+    trigger: HTMLElement,
   ) => {
+    dialogTriggerRef.current = trigger
     setEditingBoardId(boardId)
     setTitle(boardTitle)
     setDescription(boardDescription)
@@ -61,8 +72,50 @@ const Page = () => {
     setDescription("")
 
     requestAnimationFrame(() => {
-      createButtonRef.current?.focus()
+      if (dialogTriggerRef.current?.isConnected) {
+        dialogTriggerRef.current.focus()
+      } else {
+        createButtonRef.current?.focus()
+      }
     })
+  }
+
+  const handleDialogKeyDown = (event: ReactKeyboardEvent<HTMLElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault()
+      closeDialog()
+      return
+    }
+
+    if (event.key !== "Tab") return
+
+    const focusableElements = dialogRef.current?.querySelectorAll<HTMLElement>(
+      [
+        "a[href]",
+        "button:not([disabled])",
+        "input:not([disabled])",
+        "textarea:not([disabled])",
+        "select:not([disabled])",
+        '[tabindex]:not([tabindex="-1"])',
+      ].join(","),
+    )
+
+    if (!focusableElements?.length) {
+      event.preventDefault()
+      return
+    }
+
+    const firstElement = focusableElements[0]
+    const lastElement = focusableElements[focusableElements.length - 1]
+    const activeElement = document.activeElement
+
+    if (event.shiftKey && activeElement === firstElement) {
+      event.preventDefault()
+      lastElement.focus()
+    } else if (!event.shiftKey && activeElement === lastElement) {
+      event.preventDefault()
+      firstElement.focus()
+    }
   }
 
   const handleSaveBoard = (event: FormEvent<HTMLFormElement>) => {
@@ -109,22 +162,6 @@ const Page = () => {
     notify("Board deleted successfully.")
   }
 
-  useEffect(() => {
-    if (!dialogOpen) return
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        closeDialog()
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown)
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown)
-    }
-  }, [dialogOpen])
-
   return (
     <div className='min-h-screen bg-paper text-ink'>
       <div className='flex min-h-screen'>
@@ -138,6 +175,9 @@ const Page = () => {
         )}
 
         <aside
+          id='workspace-sidebar'
+          aria-label='Workspace sidebar'
+          aria-hidden={!sidebarOpen && undefined}
           className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-border bg-white transition-transform duration-200 md:static md:translate-x-0 ${
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
@@ -164,7 +204,7 @@ const Page = () => {
             <button
               type='button'
               aria-label='Close sidebar'
-              className='rounded-lg p-2 text-muted hover:bg-paper md:hidden'
+              className='rounded-lg p-2 text-muted hover:bg-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 md:hidden'
               onClick={() => setSidebarOpen(false)}
             >
               <X size={19} aria-hidden='true' />
@@ -187,9 +227,12 @@ const Page = () => {
                   key={board.id}
                   href={`/boards/${board.id}`}
                   onClick={() => setSidebarOpen(false)}
-                  className='flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-ink transition hover:bg-paper'
+                  className='flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-ink transition hover:bg-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700'
                 >
-                  <span className='h-2 w-2 shrink-0 rounded-full bg-teal-600' />
+                  <span
+                    aria-hidden='true'
+                    className='h-2 w-2 shrink-0 rounded-full bg-teal-600'
+                  />
                   <span className='min-w-0 flex-1 truncate'>{board.title}</span>
                 </Link>
               ))}
@@ -213,7 +256,9 @@ const Page = () => {
               <button
                 type='button'
                 aria-label='Open navigation'
-                className='rounded-lg p-2 hover:bg-white md:hidden'
+                aria-controls='workspace-sidebar'
+                aria-expanded={sidebarOpen}
+                className='rounded-lg p-2 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 md:hidden'
                 onClick={() => setSidebarOpen(true)}
               >
                 <Menu size={21} aria-hidden='true' />
@@ -248,7 +293,7 @@ const Page = () => {
                 </p>
               </div>
 
-              <p className='text-sm text-muted'>
+              <p className='text-sm text-muted' aria-live='polite'>
                 {boardList.length} {boardList.length === 1 ? "board" : "boards"}
               </p>
             </div>
@@ -275,7 +320,7 @@ const Page = () => {
                 <button
                   type='button'
                   onClick={openCreateDialog}
-                  className='mt-6 inline-flex items-center gap-2 rounded-xl bg-teal-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-teal-800'
+                  className='mt-6 inline-flex items-center gap-2 rounded-xl bg-teal-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700'
                 >
                   <Plus size={18} aria-hidden='true' />
                   Create your first board
@@ -322,11 +367,12 @@ const Page = () => {
                             type='button'
                             aria-label={`Edit ${board.title}`}
                             title={`Edit ${board.title}`}
-                            onClick={() =>
+                            onClick={(event) =>
                               openEditDialog(
                                 board.id,
                                 board.title,
                                 board.description,
+                                event.currentTarget,
                               )
                             }
                             className='rounded-lg p-2 text-ink/60 transition hover:bg-white/60 hover:text-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700'
@@ -363,7 +409,7 @@ const Page = () => {
 
                         <Link
                           href={`/boards/${board.id}`}
-                          className='text-sm font-semibold text-ink underline decoration-ink/30 underline-offset-4 transition hover:decoration-ink'
+                          className='rounded-sm text-sm font-semibold text-ink underline decoration-ink/30 underline-offset-4 transition hover:decoration-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800'
                         >
                           Open board
                         </Link>
@@ -379,7 +425,7 @@ const Page = () => {
 
       {dialogOpen && (
         <div
-          className='fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4 py-8'
+          className='fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-black/40 px-4 py-8'
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) {
               closeDialog()
@@ -387,11 +433,13 @@ const Page = () => {
           }}
         >
           <section
+            ref={dialogRef}
             role='dialog'
             aria-modal='true'
             aria-labelledby='board-dialog-title'
             aria-describedby='board-dialog-description'
-            className='w-full max-w-md rounded-2xl bg-white p-6 shadow-xl sm:p-8'
+            onKeyDown={handleDialogKeyDown}
+            className='my-auto w-full max-w-md rounded-2xl bg-white p-6 shadow-xl outline-none sm:p-8'
           >
             <div className='mb-6 flex items-start justify-between gap-4'>
               <div>
@@ -412,7 +460,7 @@ const Page = () => {
                 type='button'
                 aria-label='Close board dialog'
                 onClick={closeDialog}
-                className='rounded-lg p-2 text-muted transition hover:bg-paper hover:text-ink'
+                className='rounded-lg p-2 text-muted transition hover:bg-paper hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700'
               >
                 <X size={19} aria-hidden='true' />
               </button>
@@ -464,7 +512,7 @@ const Page = () => {
                 <button
                   type='button'
                   onClick={closeDialog}
-                  className='rounded-xl border border-border px-4 py-3 text-sm font-semibold transition hover:bg-paper'
+                  className='rounded-xl border border-border px-4 py-3 text-sm font-semibold transition hover:bg-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700'
                 >
                   Cancel
                 </button>
