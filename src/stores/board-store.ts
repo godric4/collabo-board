@@ -1,9 +1,12 @@
 import { create } from "zustand"
-import type { Board, BoardState } from "@/types/board"
+import type { Board, BoardColumn, BoardState } from "@/types/board"
 
 type BoardStore = BoardState & {
-  createBoard: (title: string, description: string) => string
+  createBoard: (title: string, description: string) => string | null
   deleteBoard: (boardId: string) => void
+  createColumn: (boardId: string, title: string) => string | null
+  updateColumnTitle: (columnId: string, title: string) => void
+  deleteColumn: (columnId: string) => void
 }
 
 const initialState: BoardState = {
@@ -16,57 +19,146 @@ export const useBoardStore = create<BoardStore>()((set) => ({
   ...initialState,
 
   createBoard: (title, description) => {
-    const boardId = crypto.randomUUID()
+    const trimmedTitle = title.trim()
+
+    if (!trimmedTitle) return null
+
+    const id = crypto.randomUUID()
 
     const board: Board = {
-      id: boardId,
-      title: title.trim(),
+      id,
+      title: trimmedTitle,
       description: description.trim(),
       createdAt: new Date().toISOString(),
       columnIds: [],
     }
 
-    // Add the new board without removing existing boards.
     set((state) => ({
       boards: {
         ...state.boards,
-        [boardId]: board,
+        [id]: board,
       },
     }))
 
-    return boardId
+    return id
   },
 
   deleteBoard: (boardId) => {
     set((state) => {
-      if (!state.boards[boardId]) {
-        return state
-      }
+      const board = state.boards[boardId]
 
-      // Find the board's columns and the cards inside those columns.
-      const columnIds = Object.values(state.columns)
-        .filter((column) => column.boardId === boardId)
-        .map((column) => column.id)
+      if (!board) return state
 
-      const columnIdsToDelete = new Set(columnIds)
-
-      const cardIds = Object.values(state.cards)
-        .filter((card) => columnIdsToDelete.has(card.columnId))
-        .map((card) => card.id)
-
-      const boards = { ...state.boards }
       const columns = { ...state.columns }
       const cards = { ...state.cards }
+      const boards = { ...state.boards }
+
+      board.columnIds.forEach((columnId) => {
+        const column = columns[columnId]
+
+        if (!column) return
+
+        column.cardIds.forEach((cardId) => {
+          delete cards[cardId]
+        })
+
+        delete columns[columnId]
+      })
 
       delete boards[boardId]
 
-      for (const columnId of columnIds) {
-        delete columns[columnId]
-      }
+      return { boards, columns, cards }
+    })
+  },
 
-      for (const cardId of cardIds) {
-        delete cards[cardId]
+  createColumn: (boardId, title) => {
+    const trimmedTitle = title.trim()
+
+    if (!trimmedTitle) return null
+
+    const id = crypto.randomUUID()
+
+    const column: BoardColumn = {
+      id,
+      boardId,
+      title: trimmedTitle,
+      cardIds: [],
+    }
+
+    let created = false
+
+    set((state) => {
+      const board = state.boards[boardId]
+
+      if (!board) return state
+
+      created = true
+
+      return {
+        columns: {
+          ...state.columns,
+          [id]: column,
+        },
+        boards: {
+          ...state.boards,
+          [boardId]: {
+            ...board,
+            columnIds: [...board.columnIds, id],
+          },
+        },
       }
+    })
+
+    return created ? id : null
+  },
+
+  updateColumnTitle: (columnId, title) => {
+    const trimmedTitle = title.trim()
+
+    if (!trimmedTitle) return
+
+    set((state) => {
+      const column = state.columns[columnId]
+
+      if (!column) return state
+
+      return {
+        columns: {
+          ...state.columns,
+          [columnId]: {
+            ...column,
+            title: trimmedTitle,
+          },
+        },
+      }
+    })
+  },
+
+  deleteColumn: (columnId) => {
+    set((state) => {
+      const column = state.columns[columnId]
+
+      if (!column) return state
+
+      const columns = { ...state.columns }
+      const cards = { ...state.cards }
+      const board = state.boards[column.boardId]
+
+      column.cardIds.forEach((cardId) => {
+        delete cards[cardId]
+      })
+
+      delete columns[columnId]
+
+      const boards = board
+        ? {
+            ...state.boards,
+            [board.id]: {
+              ...board,
+              columnIds: board.columnIds.filter((id) => id !== columnId),
+            },
+          }
+        : state.boards
 
       return { boards, columns, cards }
     })

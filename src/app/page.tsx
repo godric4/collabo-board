@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { LayoutGrid, Menu, Plus, Trash2, X } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
+import type { FormEvent } from "react"
 import { useBoardStore } from "@/stores/board-store"
 
 const Page = () => {
@@ -10,25 +11,25 @@ const Page = () => {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
+
   const titleInputRef = useRef<HTMLInputElement>(null)
   const createButtonRef = useRef<HTMLButtonElement>(null)
 
   const boards = useBoardStore((state) => state.boards)
   const createBoard = useBoardStore((state) => state.createBoard)
   const deleteBoard = useBoardStore((state) => state.deleteBoard)
+
   const boardList = Object.values(boards)
 
   const closeSidebar = () => setSidebarOpen(false)
 
-  const openDialog = () => {
-    // console.log("Create board clicked")
-    setDialogOpen(true)
-  }
+  const openDialog = () => setDialogOpen(true)
 
   const closeDialog = () => {
     setDialogOpen(false)
     setTitle("")
     setDescription("")
+
     requestAnimationFrame(() => createButtonRef.current?.focus())
   }
 
@@ -42,13 +43,15 @@ const Page = () => {
     }
 
     window.addEventListener("keydown", handleKeyDown)
+
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [dialogOpen])
 
-  const handleCreateBoard = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleCreateBoard = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
     const trimmedTitle = title.trim()
+
     if (!trimmedTitle) {
       titleInputRef.current?.focus()
       return
@@ -56,6 +59,14 @@ const Page = () => {
 
     createBoard(trimmedTitle, description)
     closeDialog()
+  }
+
+  const handleDeleteBoard = (boardId: string, boardTitle: string) => {
+    const confirmed = window.confirm(
+      `Delete "${boardTitle}"? This cannot be undone.`,
+    )
+
+    if (confirmed) deleteBoard(boardId)
   }
 
   return (
@@ -84,7 +95,7 @@ const Page = () => {
             <span className='flex size-8 items-center justify-center rounded-lg bg-teal-700 text-white'>
               <LayoutGrid size={18} aria-hidden='true' />
             </span>
-            Collabo Board
+            Collabo
           </Link>
 
           <button
@@ -104,7 +115,6 @@ const Page = () => {
             aria-current='page'
             className='flex items-center gap-3 rounded-lg bg-teal-50 px-3 py-2.5 text-sm font-medium text-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700'
           >
-            <LayoutGrid size={18} aria-hidden='true' />
             All boards
           </Link>
 
@@ -189,8 +199,11 @@ const Page = () => {
               aria-labelledby='empty-state-title'
               className='mt-10 flex min-h-72 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-white/60 px-6 py-12 text-center'
             >
-              <div className='flex size-12 items-center justify-center rounded-xl bg-teal-50 text-teal-700'>
-                <LayoutGrid size={23} aria-hidden='true' />
+              <div
+                className='flex size-12 items-center justify-center rounded-xl bg-teal-50 text-teal-700'
+                aria-hidden='true'
+              >
+                <LayoutGrid size={23} />
               </div>
 
               <h2
@@ -215,7 +228,6 @@ const Page = () => {
               </button>
             </section>
           ) : (
-            // display boards
             <section
               aria-label='Your boards'
               className='mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3'
@@ -231,9 +243,11 @@ const Page = () => {
                       className='min-w-0 flex-1 rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700'
                     >
                       <h2 className='truncate font-semibold'>{board.title}</h2>
+
                       <p className='mt-2 line-clamp-3 min-h-12 text-sm leading-6 text-muted'>
                         {board.description || "No description"}
                       </p>
+
                       <p className='mt-4 text-xs text-muted'>
                         Created {new Date(board.createdAt).toLocaleDateString()}
                       </p>
@@ -242,16 +256,8 @@ const Page = () => {
                     <button
                       type='button'
                       aria-label={`Delete ${board.title}`}
-                      onClick={() => {
-                        if (
-                          window.confirm(
-                            `Delete "${board.title}"? This cannot be undone.`,
-                          )
-                        ) {
-                          deleteBoard(board.id)
-                        }
-                      }}
-                      className='shrink-0 rounded-lg p-2  text-red-400 hover:bg-red-50 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700'
+                      onClick={() => handleDeleteBoard(board.id, board.title)}
+                      className='shrink-0 rounded-lg p-2 text-red-400 hover:bg-red-50 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700'
                     >
                       <Trash2 size={18} aria-hidden='true' />
                     </button>
@@ -265,7 +271,7 @@ const Page = () => {
 
       {dialogOpen && (
         <div
-          className='fixed inset-0 z-60 flex items-center justify-center bg-black/40 p-4'
+          className='fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4'
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) closeDialog()
           }}

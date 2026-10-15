@@ -1,4 +1,3 @@
-// define domain models
 export type Board = {
   id: string
   title: string
@@ -23,7 +22,6 @@ export type BoardCard = {
   dueDate: string | null
 }
 
-// define normalized state
 export type BoardState = {
   boards: Record<string, Board>
   columns: Record<string, BoardColumn>
