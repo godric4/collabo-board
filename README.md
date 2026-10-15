@@ -1,36 +1,33 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Collabo (Collaborative Knowledge Board)
+
+Collabo is a TGR Stage 1 project built to organise ideas, tasks, and milestones in one place. Users can create boards, group work into columns, and manage cards with descriptions, tags, and due dates.
+
+## Tech Stack
+
+- Next.js (App Router)
+- TypeScript
+- Tailwind CSS
+- Zustand
+- Lucide React
 
 ## Getting Started
 
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
 pnpm dev
-# or
-bun dev
-```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Project Structure
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `src/app/` — dashboard and board pages
+- `src/components/` — reusable components and providers
+- `src/stores/` — Zustand store and state actions
+- `src/types/` — TypeScript types for boards, columns, and cards
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## State Management
 
-## Learn More
+I used Zustand to manage the shared board data. Boards, columns, and cards are stored separately and linked by IDs, which makes individual items easier to update and delete.
 
-To learn more about Next.js, take a look at the following resources:
+The store handles the main CRUD operations, while Zustand's persistence middleware saves the board data to localStorage. A separate hydration component handles loading saved data in the browser.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Accessibility and Performance
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The interface includes keyboard and focus handling for the dashboard dialog, accessible labels, and visible focus styles. The normalised state structure keeps the data organised, while Zustand subscriptions help components access the state they need.
