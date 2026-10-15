@@ -178,7 +178,7 @@ const Page = () => {
           id='workspace-sidebar'
           aria-label='Workspace sidebar'
           aria-hidden={!sidebarOpen && undefined}
-          className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-border bg-white transition-transform duration-200 md:static md:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-border bg-teal-700 transition-transform duration-200 md:static md:translate-x-0 ${
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
@@ -188,14 +188,14 @@ const Page = () => {
               className='flex items-center gap-3'
               aria-label='Collabo Board home'
             >
-              <span className='flex h-10 w-10 items-center justify-center rounded-xl bg-teal-700 text-white'>
+              <span className='flex h-10 w-10 items-center justify-center rounded-full text-teal-700 bg-white'>
                 <LayoutGrid size={21} aria-hidden='true' />
               </span>
               <span>
-                <span className='block text-lg font-bold tracking-tight'>
-                  Collabo Board
+                <span className='block text-lg font-bold tracking-tight text-white'>
+                  Collabo
                 </span>
-                <span className='block text-xs text-muted'>
+                <span className='block text-xs text-teal-100'>
                   A little space for big ideas
                 </span>
               </span>
@@ -204,7 +204,7 @@ const Page = () => {
             <button
               type='button'
               aria-label='Close sidebar'
-              className='rounded-lg p-2 text-muted hover:bg-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 md:hidden'
+              className='rounded-lg p-2 text-teal-100 hover:bg-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 md:hidden'
               onClick={() => setSidebarOpen(false)}
             >
               <X size={19} aria-hidden='true' />
@@ -213,7 +213,7 @@ const Page = () => {
 
           <div className='flex-1 px-4 py-6'>
             <div className='mb-3 flex items-center justify-between px-2'>
-              <h2 className='text-xs font-semibold uppercase tracking-widest text-muted'>
+              <h2 className='text-xs font-semibold uppercase tracking-widest text-white'>
                 Your workspace
               </h2>
               <span className='rounded-full bg-paper px-2 py-1 text-xs text-muted'>
@@ -227,7 +227,7 @@ const Page = () => {
                   key={board.id}
                   href={`/boards/${board.id}`}
                   onClick={() => setSidebarOpen(false)}
-                  className='flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-ink transition hover:bg-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700'
+                  className='flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-white transition hover:bg-teal-100 hover:text-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700'
                 >
                   <span
                     aria-hidden='true'
@@ -238,16 +238,16 @@ const Page = () => {
               ))}
 
               {boardList.length === 0 && (
-                <p className='px-3 py-3 text-sm leading-6 text-muted'>
+                <p className='px-3 py-3 text-sm leading-6 text-teal-100'>
                   Your boards will show up here once you create one.
                 </p>
               )}
             </nav>
           </div>
 
-          <div className='border-t border-border px-6 py-4'>
-            <p className='text-xs text-muted'>Make room for good ideas.</p>
-          </div>
+          {/* <div className='border-t border-border px-6 py-4 text-center'>
+            <p className='text-xs text-teal-100'>Make room for good ideas.</p>
+          </div> */}
         </aside>
 
         <main className='min-w-0 flex-1'>
@@ -300,18 +300,6 @@ const Page = () => {
 
             {boardList.length === 0 ? (
               <section className='flex min-h-80 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-white/60 px-6 py-12 text-center'>
-                <span className='mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm'>
-                  <LayoutGrid
-                    size={28}
-                    className='text-teal-700'
-                    aria-hidden='true'
-                  />
-                </span>
-
-                <h2 className='text-xl font-semibold'>
-                  Your first board starts here
-                </h2>
-
                 <p className='mt-2 max-w-sm text-sm leading-6 text-muted'>
                   Create a board for a project, a plan, or an idea you want to
                   bring to life.

@@ -131,7 +131,7 @@ export const AlertProvider = ({ children }: AlertProviderProps) => {
         aria-label='Notifications'
         aria-live='polite'
         aria-atomic='false'
-        className='pointer-events-none fixed right-4 top-4 z-[100] flex w-[calc(100%-2rem)] max-w-sm flex-col gap-3'
+        className='pointer-events-none fixed right-4 top-4 z-100 flex w-[calc(100%-2rem)] max-w-sm flex-col gap-3'
       >
         {toasts.map((toast) => {
           const Icon =
@@ -152,7 +152,7 @@ export const AlertProvider = ({ children }: AlertProviderProps) => {
             <div
               key={toast.id}
               role={toast.type === "error" ? "alert" : "status"}
-              className='pointer-events-auto flex items-start gap-3 rounded-xl border border-border bg-white p-4 shadow-lg'
+              className='pointer-events-auto flex items-start gap-3 rounded-xl border border-border bg-paper p-4 shadow-lg'
             >
               <Icon
                 size={20}
