@@ -12,6 +12,13 @@ import {
 import { useAlerts } from "@/components/ui/alert-provider"
 import { useBoardStore } from "@/stores/board-store"
 
+const noteColors = [
+  "bg-note-yellow",
+  "bg-note-pink",
+  "bg-note-blue",
+  "bg-note-green",
+]
+
 const Page = () => {
   const boards = useBoardStore((state) => state.boards)
   const createBoard = useBoardStore((state) => state.createBoard)
@@ -39,9 +46,7 @@ const Page = () => {
   const isEditing = editingBoardId !== null
 
   useEffect(() => {
-    if (!dialogOpen) return
-
-    titleInputRef.current?.focus()
+    if (dialogOpen) titleInputRef.current?.focus()
   }, [dialogOpen])
 
   const openCreateDialog = () => {
@@ -71,6 +76,7 @@ const Page = () => {
     setTitle("")
     setDescription("")
 
+    // Return the keyboard to the control that opened the dialog.
     requestAnimationFrame(() => {
       if (dialogTriggerRef.current?.isConnected) {
         dialogTriggerRef.current.focus()
@@ -177,18 +183,17 @@ const Page = () => {
         <aside
           id='workspace-sidebar'
           aria-label='Workspace sidebar'
-          aria-hidden={!sidebarOpen && undefined}
-          className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-border bg-teal-700 transition-transform duration-200 md:static md:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-teal-800/20 bg-teal-700 transition-transform duration-200 md:static md:translate-x-0 ${
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
-          <div className='flex h-20 items-center justify-between border-b border-border px-6'>
+          <div className='flex h-20 items-center justify-between border-b border-white/15 px-6'>
             <Link
               href='/'
               className='flex items-center gap-3'
               aria-label='Collabo Board home'
             >
-              <span className='flex h-10 w-10 items-center justify-center rounded-full text-teal-700 bg-white'>
+              <span className='flex h-10 w-10 items-center justify-center rounded-full bg-white text-teal-700'>
                 <LayoutGrid size={21} aria-hidden='true' />
               </span>
               <span>
@@ -204,7 +209,7 @@ const Page = () => {
             <button
               type='button'
               aria-label='Close sidebar'
-              className='rounded-lg p-2 text-teal-100 hover:bg-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 md:hidden'
+              className='rounded-lg p-2 text-white hover:bg-white/10 md:hidden'
               onClick={() => setSidebarOpen(false)}
             >
               <X size={19} aria-hidden='true' />
@@ -213,25 +218,32 @@ const Page = () => {
 
           <div className='flex-1 px-4 py-6'>
             <div className='mb-3 flex items-center justify-between px-2'>
-              <h2 className='text-xs font-semibold uppercase tracking-widest text-white'>
+              <h2 className='text-xs font-semibold uppercase tracking-widest text-teal-50'>
                 Your workspace
               </h2>
-              <span className='rounded-full bg-paper px-2 py-1 text-xs text-muted'>
+              <span className='rounded-full bg-white/15 px-2 py-1 text-xs text-white'>
                 {boardList.length}
               </span>
             </div>
 
             <nav aria-label='Your boards' className='space-y-1'>
-              {boardList.map((board) => (
+              {boardList.map((board, index) => (
                 <Link
                   key={board.id}
                   href={`/boards/${board.id}`}
                   onClick={() => setSidebarOpen(false)}
-                  className='flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-white transition hover:bg-teal-100 hover:text-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700'
+                  className='flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-white transition hover:bg-white/15 focus-visible:outline-white'
                 >
                   <span
                     aria-hidden='true'
-                    className='h-2 w-2 shrink-0 rounded-full bg-teal-600'
+                    className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                      [
+                        "bg-note-yellow",
+                        "bg-note-pink",
+                        "bg-note-blue",
+                        "bg-note-green",
+                      ][index % 4]
+                    }`}
                   />
                   <span className='min-w-0 flex-1 truncate'>{board.title}</span>
                 </Link>
@@ -244,10 +256,6 @@ const Page = () => {
               )}
             </nav>
           </div>
-
-          {/* <div className='border-t border-border px-6 py-4 text-center'>
-            <p className='text-xs text-teal-100'>Make room for good ideas.</p>
-          </div> */}
         </aside>
 
         <main className='min-w-0 flex-1'>
@@ -258,7 +266,7 @@ const Page = () => {
                 aria-label='Open navigation'
                 aria-controls='workspace-sidebar'
                 aria-expanded={sidebarOpen}
-                className='rounded-lg p-2 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 md:hidden'
+                className='rounded-lg p-2 hover:bg-white md:hidden'
                 onClick={() => setSidebarOpen(true)}
               >
                 <Menu size={21} aria-hidden='true' />
@@ -276,7 +284,7 @@ const Page = () => {
               ref={createButtonRef}
               type='button'
               onClick={openCreateDialog}
-              className='inline-flex items-center gap-2 rounded-xl bg-teal-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700'
+              className='inline-flex items-center gap-2 rounded-xl bg-teal-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-teal-800'
             >
               <Plus size={18} aria-hidden='true' />
               <span className='hidden sm:inline'>New board</span>
@@ -289,7 +297,7 @@ const Page = () => {
               <div>
                 <h2 className='text-lg font-semibold'>All boards</h2>
                 <p className='mt-1 text-sm text-muted'>
-                  Keep your projects, plans, and ideas in one place.
+                  Your projects, plans, and ideas — all in one place.
                 </p>
               </div>
 
@@ -299,16 +307,25 @@ const Page = () => {
             </div>
 
             {boardList.length === 0 ? (
-              <section className='flex min-h-80 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-white/60 px-6 py-12 text-center'>
+              <section className='flex min-h-80 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-white/50 px-6 py-12 text-center'>
+                <div
+                  aria-hidden='true'
+                  className='mb-5 flex h-14 w-14 rotate-3 items-center justify-center rounded-xl bg-note-yellow shadow-sm'
+                >
+                  <Plus size={25} />
+                </div>
+                <h2 className='text-lg font-semibold'>
+                  A little space for your next idea
+                </h2>
                 <p className='mt-2 max-w-sm text-sm leading-6 text-muted'>
-                  Create a board for a project, a plan, or an idea you want to
-                  bring to life.
+                  Start a board for something you are planning, building, or
+                  figuring out.
                 </p>
 
                 <button
                   type='button'
                   onClick={openCreateDialog}
-                  className='mt-6 inline-flex items-center gap-2 rounded-xl bg-teal-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700'
+                  className='mt-6 inline-flex items-center gap-2 rounded-xl bg-teal-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-teal-800'
                 >
                   <Plus size={18} aria-hidden='true' />
                   Create your first board
@@ -316,95 +333,84 @@ const Page = () => {
               </section>
             ) : (
               <div className='grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3'>
-                {boardList.map((board, index) => {
-                  const noteColors = [
-                    "bg-note-yellow",
-                    "bg-note-pink",
-                    "bg-note-blue",
-                    "bg-note-green",
-                  ]
+                {boardList.map((board, index) => (
+                  <article
+                    key={board.id}
+                    className={`group relative rounded-xl border border-black/5 ${
+                      noteColors[index % noteColors.length]
+                    } p-5 pt-8 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md`}
+                  >
+                    {/* A small pin keeps the paper-note idea without adding clutter. */}
+                    <span
+                      aria-hidden='true'
+                      className='absolute left-1/2 top-3 h-3 w-3 -translate-x-1/2 rounded-full border border-black/15 bg-white shadow-sm'
+                    />
 
-                  const noteColor = noteColors[index % noteColors.length]
-
-                  return (
-                    <article
-                      key={board.id}
-                      className={`group relative rounded-2xl border border-black/5 ${noteColor} p-5 pt-8 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-md`}
-                    >
-                      <span
-                        aria-hidden='true'
-                        className='absolute left-1/2 top-3 h-3 w-3 -translate-x-1/2 rounded-full border border-black/15 bg-white shadow-sm'
-                      />
-
-                      <div className='flex items-start justify-between gap-3'>
-                        <Link
-                          href={`/boards/${board.id}`}
-                          className='min-w-0 flex-1 rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal-800'
-                        >
-                          <h3 className='break-words text-lg font-semibold'>
-                            {board.title}
-                          </h3>
-
-                          <p className='mt-2 min-h-12 whitespace-pre-wrap break-words text-sm leading-6 text-ink/75'>
-                            {board.description || "A space for your ideas."}
-                          </p>
-                        </Link>
-
-                        <div className='flex shrink-0 items-center gap-1'>
-                          <button
-                            type='button'
-                            aria-label={`Edit ${board.title}`}
-                            title={`Edit ${board.title}`}
-                            onClick={(event) =>
-                              openEditDialog(
-                                board.id,
-                                board.title,
-                                board.description,
-                                event.currentTarget,
-                              )
-                            }
-                            className='rounded-lg p-2 text-ink/60 transition hover:bg-white/60 hover:text-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700'
-                          >
-                            <Pencil size={17} aria-hidden='true' />
-                          </button>
-
-                          <button
-                            type='button'
-                            aria-label={`Delete ${board.title}`}
-                            title={`Delete ${board.title}`}
-                            onClick={() =>
-                              handleDeleteBoard(board.id, board.title)
-                            }
-                            className='rounded-lg p-2 text-ink/60 transition hover:bg-white/60 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700'
-                          >
-                            <Trash2 size={17} aria-hidden='true' />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className='mt-5 flex items-center justify-between border-t border-black/10 pt-3'>
-                        <p className='text-xs text-ink/60'>
-                          Created{" "}
-                          {new Date(board.createdAt).toLocaleDateString(
-                            undefined,
-                            {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            },
-                          )}
+                    <div className='flex items-start justify-between gap-3'>
+                      <Link
+                        href={`/boards/${board.id}`}
+                        className='min-w-0 flex-1 rounded-sm'
+                      >
+                        <h3 className='break-words text-lg font-semibold leading-snug'>
+                          {board.title}
+                        </h3>
+                        <p className='mt-2 min-h-12 whitespace-pre-wrap break-words text-sm leading-6 text-ink/75'>
+                          {board.description || "A space for your ideas."}
                         </p>
+                      </Link>
 
-                        <Link
-                          href={`/boards/${board.id}`}
-                          className='rounded-sm text-sm font-semibold text-ink underline decoration-ink/30 underline-offset-4 transition hover:decoration-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800'
+                      <div className='flex shrink-0 items-center gap-1 opacity-100 sm:opacity-70 sm:transition group-hover:opacity-100'>
+                        <button
+                          type='button'
+                          aria-label={`Edit ${board.title}`}
+                          title={`Edit ${board.title}`}
+                          onClick={(event) =>
+                            openEditDialog(
+                              board.id,
+                              board.title,
+                              board.description,
+                              event.currentTarget,
+                            )
+                          }
+                          className='rounded-lg p-2 text-ink/65 transition hover:bg-white/60 hover:text-teal-800'
                         >
-                          Open board
-                        </Link>
+                          <Pencil size={16} aria-hidden='true' />
+                        </button>
+                        <button
+                          type='button'
+                          aria-label={`Delete ${board.title}`}
+                          title={`Delete ${board.title}`}
+                          onClick={() =>
+                            handleDeleteBoard(board.id, board.title)
+                          }
+                          className='rounded-lg p-2 text-ink/65 transition hover:bg-white/60 hover:text-red-700'
+                        >
+                          <Trash2 size={16} aria-hidden='true' />
+                        </button>
                       </div>
-                    </article>
-                  )
-                })}
+                    </div>
+
+                    <div className='mt-5 flex items-center justify-between gap-3 border-t border-black/10 pt-3'>
+                      <p className='text-xs text-ink/60'>
+                        Created{" "}
+                        {new Date(board.createdAt).toLocaleDateString(
+                          undefined,
+                          {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          },
+                        )}
+                      </p>
+                      <Link
+                        href={`/boards/${board.id}`}
+                        className='rounded-sm text-sm font-semibold text-ink underline decoration-ink/30 underline-offset-4 transition hover:decoration-ink'
+                      >
+                        Open board
+                      </Link>
+                    </div>
+                  </article>
+                ))}
               </div>
             )}
           </div>
@@ -413,11 +419,9 @@ const Page = () => {
 
       {dialogOpen && (
         <div
-          className='fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-black/40 px-4 py-8'
+          className='fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-ink/40 px-4 py-8'
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              closeDialog()
-            }
+            if (event.target === event.currentTarget) closeDialog()
           }}
         >
           <section
@@ -427,10 +431,13 @@ const Page = () => {
             aria-labelledby='board-dialog-title'
             aria-describedby='board-dialog-description'
             onKeyDown={handleDialogKeyDown}
-            className='my-auto w-full max-w-md rounded-2xl bg-white p-6 shadow-xl outline-none sm:p-8'
+            className='my-auto w-full max-w-md rounded-xl border border-border bg-paper p-6 shadow-2xl outline-none sm:p-8'
           >
             <div className='mb-6 flex items-start justify-between gap-4'>
               <div>
+                <p className='mb-2 text-xs font-semibold uppercase tracking-widest text-teal-700'>
+                  {isEditing ? "Make a change" : "New idea"}
+                </p>
                 <h2 id='board-dialog-title' className='text-xl font-bold'>
                   {isEditing ? "Edit board" : "Create a board"}
                 </h2>
@@ -439,8 +446,8 @@ const Page = () => {
                   className='mt-2 text-sm leading-6 text-muted'
                 >
                   {isEditing
-                    ? "Update your board name or description."
-                    : "Give your next idea a place to grow."}
+                    ? "Change the name or give your board a little more context."
+                    : "Give your next idea somewhere to live."}
                 </p>
               </div>
 
@@ -448,7 +455,7 @@ const Page = () => {
                 type='button'
                 aria-label='Close board dialog'
                 onClick={closeDialog}
-                className='rounded-lg p-2 text-muted transition hover:bg-paper hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700'
+                className='rounded-lg p-2 text-muted transition hover:bg-white hover:text-ink'
               >
                 <X size={19} aria-hidden='true' />
               </button>
@@ -472,7 +479,7 @@ const Page = () => {
                   placeholder='e.g. Website redesign'
                   maxLength={100}
                   required
-                  className='w-full rounded-xl border border-border bg-white px-4 py-3 text-sm outline-none transition placeholder:text-muted/70 focus:border-teal-700 focus:ring-2 focus:ring-teal-700/15'
+                  className='w-full rounded-lg border border-border bg-white px-4 py-3 text-sm outline-none transition placeholder:text-muted/70 focus:border-teal-700 focus:ring-2 focus:ring-teal-700/15'
                 />
               </div>
 
@@ -481,7 +488,7 @@ const Page = () => {
                   htmlFor='board-description'
                   className='mb-2 block text-sm font-medium'
                 >
-                  Description{" "}
+                  A few details{" "}
                   <span className='font-normal text-muted'>(optional)</span>
                 </label>
                 <textarea
@@ -489,10 +496,10 @@ const Page = () => {
                   name='description'
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
-                  placeholder='What is this board for?'
+                  placeholder='What are you working on?'
                   rows={3}
                   maxLength={500}
-                  className='w-full resize-y rounded-xl border border-border bg-white px-4 py-3 text-sm outline-none transition placeholder:text-muted/70 focus:border-teal-700 focus:ring-2 focus:ring-teal-700/15'
+                  className='w-full resize-y rounded-lg border border-border bg-white px-4 py-3 text-sm leading-6 outline-none transition placeholder:text-muted/70 focus:border-teal-700 focus:ring-2 focus:ring-teal-700/15'
                 />
               </div>
 
@@ -500,17 +507,16 @@ const Page = () => {
                 <button
                   type='button'
                   onClick={closeDialog}
-                  className='rounded-xl border border-border px-4 py-3 text-sm font-semibold transition hover:bg-paper focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700'
+                  className='rounded-lg border border-border px-4 py-3 text-sm font-semibold transition hover:bg-white'
                 >
                   Cancel
                 </button>
-
                 <button
                   type='submit'
-                  className='inline-flex items-center justify-center gap-2 rounded-xl bg-teal-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700'
+                  className='inline-flex items-center justify-center gap-2 rounded-lg bg-teal-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-teal-800'
                 >
                   {isEditing ? (
-                    <Pencil size={17} aria-hidden='true' />
+                    <Pencil size={16} aria-hidden='true' />
                   ) : (
                     <Plus size={17} aria-hidden='true' />
                   )}
