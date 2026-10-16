@@ -63,6 +63,4 @@ flowchart TD
 
 The interface includes keyboard and focus handling for the dashboard dialog, accessible labels, and visible focus styles. The normalised state keeps data organised, while Zustand subscriptions let components access the state they need.
 
-## Future Improvements
 
-Possible next steps include adding a backend, user authentication, real-time collaboration, and automated tests.
