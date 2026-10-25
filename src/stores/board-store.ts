@@ -11,7 +11,13 @@ type CreateCardInput = {
 
 type UpdateCardInput = Partial<CreateCardInput>
 
+type BoardHistory = {
+  past: BoardState[]
+  future: BoardState[]
+}
+
 type BoardStore = BoardState & {
+  history: BoardHistory
   createBoard: (title: string, description: string) => string | null
   updateBoard: (boardId: string, title: string, description: string) => void
   deleteBoard: (boardId: string) => void
@@ -21,6 +27,13 @@ type BoardStore = BoardState & {
   createCard: (columnId: string, input: CreateCardInput) => string | null
   updateCard: (cardId: string, updates: UpdateCardInput) => void
   deleteCard: (cardId: string) => void
+  moveCard: (
+    cardId: string,
+    destinationColumnId: string,
+    destinationIndex: number,
+  ) => boolean
+  undo: () => void
+  redo: () => void
 }
 
 const initialState: BoardState = {
@@ -33,10 +46,27 @@ const normaliseTags = (tags: string[] = []) => [
   ...new Set(tags.map((tag) => tag.trim()).filter(Boolean)),
 ]
 
+const historyLimit = 50
+
+const snapshot = (state: BoardState): BoardState => ({
+  boards: state.boards,
+  columns: state.columns,
+  cards: state.cards,
+})
+
+const withHistory = (state: BoardStore, next: BoardState) => ({
+  ...next,
+  history: {
+    past: [...state.history.past, snapshot(state)].slice(-historyLimit),
+    future: [],
+  },
+})
+
 export const useBoardStore = create<BoardStore>()(
   persist(
     (set) => ({
       ...initialState,
+      history: { past: [], future: [] },
 
       createBoard: (title, description) => {
         const trimmedTitle = title.trim()
@@ -53,12 +83,16 @@ export const useBoardStore = create<BoardStore>()(
           columnIds: [],
         }
 
-        set((state) => ({
-          boards: {
-            ...state.boards,
-            [id]: board,
-          },
-        }))
+        set((state) =>
+          withHistory(state, {
+            boards: {
+              ...state.boards,
+              [id]: board,
+            },
+            columns: state.columns,
+            cards: state.cards,
+          }),
+        )
 
         return id
       },
@@ -73,7 +107,7 @@ export const useBoardStore = create<BoardStore>()(
 
           if (!board) return state
 
-          return {
+          return withHistory(state, {
             boards: {
               ...state.boards,
               [boardId]: {
@@ -82,7 +116,9 @@ export const useBoardStore = create<BoardStore>()(
                 description: description.trim(),
               },
             },
-          }
+            columns: state.columns,
+            cards: state.cards,
+          })
         })
       },
 
@@ -110,7 +146,7 @@ export const useBoardStore = create<BoardStore>()(
 
           delete boards[boardId]
 
-          return { boards, columns, cards }
+          return withHistory(state, { boards, columns, cards })
         })
       },
 
@@ -137,7 +173,7 @@ export const useBoardStore = create<BoardStore>()(
 
           created = true
 
-          return {
+          return withHistory(state, {
             columns: {
               ...state.columns,
               [id]: column,
@@ -149,7 +185,8 @@ export const useBoardStore = create<BoardStore>()(
                 columnIds: [...board.columnIds, id],
               },
             },
-          }
+            cards: state.cards,
+          })
         })
 
         return created ? id : null
@@ -165,7 +202,7 @@ export const useBoardStore = create<BoardStore>()(
 
           if (!column) return state
 
-          return {
+          return withHistory(state, {
             columns: {
               ...state.columns,
               [columnId]: {
@@ -173,7 +210,9 @@ export const useBoardStore = create<BoardStore>()(
                 title: trimmedTitle,
               },
             },
-          }
+            boards: state.boards,
+            cards: state.cards,
+          })
         })
       },
 
@@ -203,7 +242,7 @@ export const useBoardStore = create<BoardStore>()(
               }
             : state.boards
 
-          return { boards, columns, cards }
+          return withHistory(state, { boards, columns, cards })
         })
       },
 
@@ -231,7 +270,7 @@ export const useBoardStore = create<BoardStore>()(
 
           created = true
 
-          return {
+          return withHistory(state, {
             cards: {
               ...state.cards,
               [id]: card,
@@ -243,7 +282,8 @@ export const useBoardStore = create<BoardStore>()(
                 cardIds: [...column.cardIds, id],
               },
             },
-          }
+            boards: state.boards,
+          })
         })
 
         return created ? id : null
@@ -277,12 +317,14 @@ export const useBoardStore = create<BoardStore>()(
                 : updates.dueDate || null,
           }
 
-          return {
+          return withHistory(state, {
             cards: {
               ...state.cards,
               [cardId]: updatedCard,
             },
-          }
+            boards: state.boards,
+            columns: state.columns,
+          })
         })
       },
 
@@ -307,7 +349,122 @@ export const useBoardStore = create<BoardStore>()(
               }
             : state.columns
 
-          return { cards, columns }
+          return withHistory(state, {
+            cards,
+            columns,
+            boards: state.boards,
+          })
+        })
+      },
+
+      moveCard: (cardId, destinationColumnId, destinationIndex) => {
+        let moved = false
+
+        set((state) => {
+          const card = state.cards[cardId]
+          const sourceColumn = card ? state.columns[card.columnId] : undefined
+          const destinationColumn = state.columns[destinationColumnId]
+
+          if (!card || !sourceColumn || !destinationColumn) return state
+
+          const sourceCardIds = sourceColumn.cardIds.filter((id) => id !== cardId)
+          const destinationCardIds =
+            sourceColumn.id === destinationColumn.id
+              ? sourceCardIds
+              : [...destinationColumn.cardIds]
+          const requestedIndex = Number.isFinite(destinationIndex)
+            ? Math.trunc(destinationIndex)
+            : destinationCardIds.length
+          const insertionIndex = Math.min(
+            Math.max(requestedIndex, 0),
+            destinationCardIds.length,
+          )
+
+          destinationCardIds.splice(insertionIndex, 0, cardId)
+
+          if (
+            sourceColumn.id === destinationColumn.id &&
+            sourceColumn.cardIds.every(
+              (existingCardId, index) =>
+                existingCardId === destinationCardIds[index],
+            )
+          ) {
+            return state
+          }
+
+          moved = true
+
+          const columns =
+            sourceColumn.id === destinationColumn.id
+              ? {
+                  ...state.columns,
+                  [sourceColumn.id]: {
+                    ...sourceColumn,
+                    cardIds: destinationCardIds,
+                  },
+                }
+              : {
+                  ...state.columns,
+                  [sourceColumn.id]: {
+                    ...sourceColumn,
+                    cardIds: sourceCardIds,
+                  },
+                  [destinationColumn.id]: {
+                    ...destinationColumn,
+                    cardIds: destinationCardIds,
+                  },
+                }
+
+          return withHistory(state, {
+            boards: state.boards,
+            columns,
+            cards: {
+              ...state.cards,
+              [cardId]: {
+                ...card,
+                columnId: destinationColumnId,
+              },
+            },
+          })
+        })
+
+        return moved
+      },
+
+      undo: () => {
+        set((state) => {
+          const previous = state.history.past.at(-1)
+
+          if (!previous) return state
+
+          return {
+            ...previous,
+            history: {
+              past: state.history.past.slice(0, -1),
+              future: [snapshot(state), ...state.history.future].slice(
+                0,
+                historyLimit,
+              ),
+            },
+          }
+        })
+      },
+
+      redo: () => {
+        set((state) => {
+          const [next, ...future] = state.history.future
+
+          if (!next) return state
+
+          return {
+            ...next,
+            history: {
+              past: [...state.history.past, snapshot(state)].slice(
+                -historyLimit,
+              ),
+              future,
+            },
+          }
         })
       },
     }),

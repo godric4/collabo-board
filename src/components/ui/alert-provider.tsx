@@ -183,7 +183,7 @@ export const AlertProvider = ({ children }: AlertProviderProps) => {
 
       {confirmation && (
         <div
-          className='fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4'
+          className='fixed inset-0 z-110 flex items-center justify-center bg-black/40 p-4'
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) {
               closeConfirmation(false)
