@@ -1,7 +1,15 @@
-import { useState, type DragEvent, type FormEvent, type KeyboardEvent } from "react"
+import {
+  useState,
+  type DragEvent,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react"
 import { Pencil, Plus, Trash2 } from "lucide-react"
 import { BoardCard } from "@/components/board/board-card"
-import type { BoardCard as BoardCardData, BoardColumn as BoardColumnData } from "@/types/board"
+import type {
+  BoardCard as BoardCardData,
+  BoardColumn as BoardColumnData,
+} from "@/types/board"
 
 const columnColors = [
   "bg-note-yellow",
@@ -17,6 +25,7 @@ type BoardColumnProps = {
   onRename: (columnId: string, title: string) => boolean
   onDelete: (columnId: string, title: string) => void
   onCreateCard: (columnId: string) => void
+  onOpenCard: (cardId: string) => void
   onEditCard: (cardId: string) => void
   onDeleteCard: (cardId: string, title: string) => void
   draggedCardId: string | null
@@ -39,6 +48,7 @@ export const BoardColumn = ({
   onRename,
   onDelete,
   onCreateCard,
+  onOpenCard,
   onEditCard,
   onDeleteCard,
   draggedCardId,
@@ -112,7 +122,9 @@ export const BoardColumn = ({
         <>
           <div className='flex items-start justify-between gap-2'>
             <div className='min-w-0 flex-1'>
-              <h2 className='break-words text-base font-semibold'>{column.title}</h2>
+              <h2 className='break-words text-base font-semibold'>
+                {column.title}
+              </h2>
               <p className='mt-1 text-xs text-ink/60'>
                 {cards.length} {cards.length === 1 ? "card" : "cards"}
               </p>
@@ -150,6 +162,7 @@ export const BoardColumn = ({
               <BoardCard
                 key={card.id}
                 card={card}
+                onOpen={onOpenCard}
                 onEdit={onEditCard}
                 onDelete={onDeleteCard}
                 isDragging={draggedCardId === card.id}

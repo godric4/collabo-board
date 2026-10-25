@@ -22,8 +22,18 @@ export type BoardCard = {
   dueDate: string | null
 }
 
+export type BoardComment = {
+  id: string
+  cardId: string
+  parentId: string | null
+  content: string
+  createdAt: string
+  updatedAt: string
+}
+
 export type BoardState = {
   boards: Record<string, Board>
   columns: Record<string, BoardColumn>
   cards: Record<string, BoardCard>
+  comments: Record<string, BoardComment>
 }

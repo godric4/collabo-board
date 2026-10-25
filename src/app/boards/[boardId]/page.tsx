@@ -8,10 +8,11 @@ import { AddColumnControl } from "@/components/board/add-column-control"
 import { BoardColumn } from "@/components/board/board-column"
 import { BoardEmptyState } from "@/components/board/board-empty-state"
 import { BoardHeader } from "@/components/board/board-header"
+import { CardDetailsDialog } from "@/components/board/card-details-dialog"
 import { CardDialog } from "@/components/board/card-dialog"
 import { useAlerts } from "@/components/ui/alert-provider"
 import { useBoardStore } from "@/stores/board-store"
-import type { BoardCard } from "@/types/board"
+import type { BoardCard as BoardCardData } from "@/types/board"
 
 type CardDialogState = {
   columnId: string
@@ -45,6 +46,7 @@ const BoardPage = () => {
   const { confirm, notify } = useAlerts()
   const [isAddingColumn, setIsAddingColumn] = useState(false)
   const [cardDialog, setCardDialog] = useState<CardDialogState | null>(null)
+  const [detailsCardId, setDetailsCardId] = useState<string | null>(null)
   const [draggedCardId, setDraggedCardId] = useState<string | null>(null)
   const [dragTarget, setDragTarget] = useState<DragTarget | null>(null)
 
@@ -96,19 +98,22 @@ const BoardPage = () => {
 
     if (!confirmed) return
 
-    deleteColumn(columnId)
+    if (detailsCardId && allCards[detailsCardId]?.columnId === columnId) {
+      setDetailsCardId(null)
+    }
 
     if (cardDialog?.columnId === columnId) {
       setCardDialog(null)
     }
 
+    deleteColumn(columnId)
     notify("Column deleted successfully.")
   }
 
   const handleSaveCard = (
     columnId: string,
     cardId: string | undefined,
-    values: Omit<BoardCard, "id" | "columnId">,
+    values: Omit<BoardCardData, "id" | "columnId">,
   ) => {
     if (cardId) {
       updateCard(cardId, values)
@@ -144,6 +149,10 @@ const BoardPage = () => {
       setCardDialog(null)
     }
 
+    if (detailsCardId === cardId) {
+      setDetailsCardId(null)
+    }
+
     notify("Card deleted successfully.")
   }
 
@@ -152,10 +161,7 @@ const BoardPage = () => {
     setDragTarget(null)
   }
 
-  const handleDragStart = (
-    event: DragEvent<HTMLElement>,
-    cardId: string,
-  ) => {
+  const handleDragStart = (event: DragEvent<HTMLElement>, cardId: string) => {
     event.dataTransfer.effectAllowed = "move"
     event.dataTransfer.setData("text/plain", cardId)
     setDraggedCardId(cardId)
@@ -200,14 +206,17 @@ const BoardPage = () => {
     const card = allCards[cardId]
     if (!card) return
 
-    const sourceIndex = columns.findIndex((column) => column.id === card.columnId)
-    const destinationColumn = columns[
-      direction === "previous" ? sourceIndex - 1 : sourceIndex + 1
-    ]
+    const sourceIndex = columns.findIndex(
+      (column) => column.id === card.columnId,
+    )
+    const destinationColumn =
+      columns[direction === "previous" ? sourceIndex - 1 : sourceIndex + 1]
 
     if (!destinationColumn) return
 
-    if (moveCard(cardId, destinationColumn.id, destinationColumn.cardIds.length)) {
+    if (
+      moveCard(cardId, destinationColumn.id, destinationColumn.cardIds.length)
+    ) {
       notify(`Card moved to ${destinationColumn.title}.`)
     }
   }
@@ -231,7 +240,11 @@ const BoardPage = () => {
       <main className='flex min-h-screen items-center justify-center bg-paper px-6 text-ink'>
         <section className='max-w-md text-center'>
           <div className='mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-sm'>
-            <MoreHorizontal size={26} className='text-muted' aria-hidden='true' />
+            <MoreHorizontal
+              size={26}
+              className='text-muted'
+              aria-hidden='true'
+            />
           </div>
 
           <h1 className='text-2xl font-bold'>Board not found</h1>
@@ -251,7 +264,11 @@ const BoardPage = () => {
     )
   }
 
-  const editedCard = cardDialog?.cardId ? allCards[cardDialog.cardId] : undefined
+  const editedCard = cardDialog?.cardId
+    ? allCards[cardDialog.cardId]
+    : undefined
+
+  const detailsCard = detailsCardId ? allCards[detailsCardId] : undefined
 
   return (
     <main className='min-h-screen bg-paper text-ink'>
@@ -287,9 +304,16 @@ const BoardPage = () => {
                   onRename={handleRenameColumn}
                   onDelete={handleDeleteColumn}
                   onCreateCard={(columnId) => setCardDialog({ columnId })}
+                  onOpenCard={(cardId) => setDetailsCardId(cardId)}
                   onEditCard={(cardId) => {
                     const card = allCards[cardId]
-                    if (card) setCardDialog({ columnId: card.columnId, cardId })
+                    if (card) {
+                      setDetailsCardId(null)
+                      setCardDialog({
+                        columnId: card.columnId,
+                        cardId,
+                      })
+                    }
                   }}
                   onDeleteCard={handleDeleteCard}
                   draggedCardId={draggedCardId}
@@ -328,6 +352,24 @@ const BoardPage = () => {
           onClose={() => setCardDialog(null)}
           onInvalidTitle={() => notify("Please enter a card title.", "error")}
           onSave={handleSaveCard}
+        />
+      )}
+
+      {detailsCard && (
+        <CardDetailsDialog
+          key={detailsCard.id}
+          card={detailsCard}
+          onClose={() => setDetailsCardId(null)}
+          onEdit={(cardId) => {
+            const card = allCards[cardId]
+            if (!card) return
+
+            setDetailsCardId(null)
+            setCardDialog({
+              columnId: card.columnId,
+              cardId,
+            })
+          }}
         />
       )}
     </main>

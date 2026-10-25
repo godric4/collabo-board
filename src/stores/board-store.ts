@@ -1,6 +1,12 @@
 import { create } from "zustand"
 import { createJSONStorage, persist } from "zustand/middleware"
-import type { Board, BoardCard, BoardColumn, BoardState } from "@/types/board"
+import type {
+  Board,
+  BoardCard,
+  BoardColumn,
+  BoardComment,
+  BoardState,
+} from "@/types/board"
 
 type CreateCardInput = {
   title: string
@@ -32,6 +38,13 @@ type BoardStore = BoardState & {
     destinationColumnId: string,
     destinationIndex: number,
   ) => boolean
+  createComment: (
+    cardId: string,
+    content: string,
+    parentId?: string | null,
+  ) => string | null
+  updateComment: (commentId: string, content: string) => void
+  deleteComment: (commentId: string) => void
   undo: () => void
   redo: () => void
 }
@@ -40,6 +53,7 @@ const initialState: BoardState = {
   boards: {},
   columns: {},
   cards: {},
+  comments: {},
 }
 
 const normaliseTags = (tags: string[] = []) => [
@@ -52,15 +66,32 @@ const snapshot = (state: BoardState): BoardState => ({
   boards: state.boards,
   columns: state.columns,
   cards: state.cards,
+  comments: state.comments,
 })
 
-const withHistory = (state: BoardStore, next: BoardState) => ({
+const withHistory = (
+  state: BoardStore,
+  next: Omit<BoardState, "comments"> & {
+    comments?: BoardState["comments"]
+  },
+) => ({
   ...next,
+  comments: next.comments ?? state.comments,
   history: {
     past: [...state.history.past, snapshot(state)].slice(-historyLimit),
     future: [],
   },
 })
+
+const removeCommentsForCards = (
+  comments: Record<string, BoardComment>,
+  cardIds: Set<string>,
+): Record<string, BoardComment> =>
+  Object.fromEntries(
+    Object.entries(comments).filter(
+      ([, comment]) => !cardIds.has(comment.cardId),
+    ),
+  )
 
 export const useBoardStore = create<BoardStore>()(
   persist(
@@ -131,6 +162,7 @@ export const useBoardStore = create<BoardStore>()(
           const columns = { ...state.columns }
           const cards = { ...state.cards }
           const boards = { ...state.boards }
+          const deletedCardIds = new Set<string>()
 
           board.columnIds.forEach((columnId) => {
             const column = columns[columnId]
@@ -138,6 +170,7 @@ export const useBoardStore = create<BoardStore>()(
             if (!column) return
 
             column.cardIds.forEach((cardId) => {
+              deletedCardIds.add(cardId)
               delete cards[cardId]
             })
 
@@ -146,7 +179,12 @@ export const useBoardStore = create<BoardStore>()(
 
           delete boards[boardId]
 
-          return withHistory(state, { boards, columns, cards })
+          return withHistory(state, {
+            boards,
+            columns,
+            cards,
+            comments: removeCommentsForCards(state.comments, deletedCardIds),
+          })
         })
       },
 
@@ -225,6 +263,7 @@ export const useBoardStore = create<BoardStore>()(
           const columns = { ...state.columns }
           const cards = { ...state.cards }
           const board = state.boards[column.boardId]
+          const deletedCardIds = new Set(column.cardIds)
 
           column.cardIds.forEach((cardId) => {
             delete cards[cardId]
@@ -242,7 +281,12 @@ export const useBoardStore = create<BoardStore>()(
               }
             : state.boards
 
-          return withHistory(state, { boards, columns, cards })
+          return withHistory(state, {
+            boards,
+            columns,
+            cards,
+            comments: removeCommentsForCards(state.comments, deletedCardIds),
+          })
         })
       },
 
@@ -353,6 +397,7 @@ export const useBoardStore = create<BoardStore>()(
             cards,
             columns,
             boards: state.boards,
+            comments: removeCommentsForCards(state.comments, new Set([cardId])),
           })
         })
       },
@@ -367,14 +412,18 @@ export const useBoardStore = create<BoardStore>()(
 
           if (!card || !sourceColumn || !destinationColumn) return state
 
-          const sourceCardIds = sourceColumn.cardIds.filter((id) => id !== cardId)
+          const sourceCardIds = sourceColumn.cardIds.filter(
+            (id) => id !== cardId,
+          )
           const destinationCardIds =
             sourceColumn.id === destinationColumn.id
               ? sourceCardIds
               : [...destinationColumn.cardIds]
+
           const requestedIndex = Number.isFinite(destinationIndex)
             ? Math.trunc(destinationIndex)
             : destinationCardIds.length
+
           const insertionIndex = Math.min(
             Math.max(requestedIndex, 0),
             destinationCardIds.length,
@@ -431,6 +480,112 @@ export const useBoardStore = create<BoardStore>()(
         return moved
       },
 
+      createComment: (cardId, content, parentId = null) => {
+        const trimmedContent = content.trim()
+
+        if (!trimmedContent) return null
+
+        const id = crypto.randomUUID()
+        const now = new Date().toISOString()
+        let created = false
+
+        set((state) => {
+          if (!state.cards[cardId]) return state
+
+          if (parentId) {
+            const parent = state.comments[parentId]
+
+            if (!parent || parent.cardId !== cardId) return state
+          }
+
+          const comment: BoardComment = {
+            id,
+            cardId,
+            parentId,
+            content: trimmedContent,
+            createdAt: now,
+            updatedAt: now,
+          }
+
+          created = true
+
+          return withHistory(state, {
+            boards: state.boards,
+            columns: state.columns,
+            cards: state.cards,
+            comments: {
+              ...state.comments,
+              [id]: comment,
+            },
+          })
+        })
+
+        return created ? id : null
+      },
+
+      updateComment: (commentId, content) => {
+        const trimmedContent = content.trim()
+
+        if (!trimmedContent) return
+
+        set((state) => {
+          const comment = state.comments[commentId]
+
+          if (!comment || comment.content === trimmedContent) return state
+
+          return withHistory(state, {
+            boards: state.boards,
+            columns: state.columns,
+            cards: state.cards,
+            comments: {
+              ...state.comments,
+              [commentId]: {
+                ...comment,
+                content: trimmedContent,
+                updatedAt: new Date().toISOString(),
+              },
+            },
+          })
+        })
+      },
+
+      deleteComment: (commentId) => {
+        set((state) => {
+          if (!state.comments[commentId]) return state
+
+          const deletedIds = new Set([commentId])
+          let foundNewDescendant = true
+
+          while (foundNewDescendant) {
+            foundNewDescendant = false
+
+            Object.values(state.comments).forEach((comment) => {
+              if (
+                comment.parentId &&
+                deletedIds.has(comment.parentId) &&
+                !deletedIds.has(comment.id)
+              ) {
+                deletedIds.add(comment.id)
+                foundNewDescendant = true
+              }
+            })
+          }
+
+          const comments = { ...state.comments }
+
+          deletedIds.forEach((id) => {
+            delete comments[id]
+          })
+
+          return withHistory(state, {
+            boards: state.boards,
+            columns: state.columns,
+            cards: state.cards,
+            comments,
+          })
+        })
+      },
+
       undo: () => {
         set((state) => {
           const previous = state.history.past.at(-1)
@@ -476,6 +631,7 @@ export const useBoardStore = create<BoardStore>()(
         boards: state.boards,
         columns: state.columns,
         cards: state.cards,
+        comments: state.comments,
       }),
     },
   ),

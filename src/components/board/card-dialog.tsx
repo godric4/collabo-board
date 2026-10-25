@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react"
 import { Plus, X } from "lucide-react"
+import { CardComments } from "@/components/board/card-comments"
 import type { BoardCard } from "@/types/board"
 
 export type CardFormValues = {
@@ -16,15 +17,25 @@ const toFormValues = (card?: BoardCard): CardFormValues => ({
   dueDate: card?.dueDate ?? "",
 })
 
-const parseTags = (value: string) =>
-  [...new Set(value.split(",").map((tag) => tag.trim()).filter(Boolean))]
+const parseTags = (value: string) => [
+  ...new Set(
+    value
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean),
+  ),
+]
 
 type CardDialogProps = {
   columnId: string
   card?: BoardCard
   onClose: () => void
   onInvalidTitle: () => void
-  onSave: (columnId: string, cardId: string | undefined, values: Omit<BoardCard, "id" | "columnId">) => boolean
+  onSave: (
+    columnId: string,
+    cardId: string | undefined,
+    values: Omit<BoardCard, "id" | "columnId">,
+  ) => boolean
 }
 
 export const CardDialog = ({
@@ -90,13 +101,21 @@ export const CardDialog = ({
 
         <form onSubmit={handleSave} className='space-y-5'>
           <div>
-            <label htmlFor='card-title' className='mb-2 block text-sm font-medium'>
+            <label
+              htmlFor='card-title'
+              className='mb-2 block text-sm font-medium'
+            >
               Card title
             </label>
             <input
               id='card-title'
               value={form.title}
-              onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  title: event.target.value,
+                }))
+              }
               maxLength={120}
               autoFocus
               placeholder='e.g. Draft the homepage'
@@ -105,46 +124,73 @@ export const CardDialog = ({
           </div>
 
           <div>
-            <label htmlFor='card-description' className='mb-2 block text-sm font-medium'>
+            <label
+              htmlFor='card-description'
+              className='mb-2 block text-sm font-medium'
+            >
               Description
             </label>
             <textarea
               id='card-description'
               value={form.description}
-              onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  description: event.target.value,
+                }))
+              }
               rows={5}
               maxLength={5000}
-              placeholder={'Describe the task...\n\nUse **bold**, *italic*, `code`, # headings, and - list items.'}
+              placeholder={
+                "Describe the task...\n\nUse **bold**, *italic*, `code`, # headings, and - list items."
+              }
               className='w-full resize-y rounded-xl border border-border px-4 py-3 text-sm leading-6 outline-none transition placeholder:text-muted/70 focus:border-teal-700 focus:ring-2 focus:ring-teal-700/15'
             />
             <p className='mt-2 text-xs leading-5 text-muted'>
-              Supports simple Markdown: headings, bold, italic, inline code, and bulleted lists.
+              Supports simple Markdown: headings, bold, italic, inline code, and
+              bulleted lists.
             </p>
           </div>
 
           <div>
-            <label htmlFor='card-tags' className='mb-2 block text-sm font-medium'>
+            <label
+              htmlFor='card-tags'
+              className='mb-2 block text-sm font-medium'
+            >
               Tags
             </label>
             <input
               id='card-tags'
               value={form.tags}
-              onChange={(event) => setForm((current) => ({ ...current, tags: event.target.value }))}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, tags: event.target.value }))
+              }
               placeholder='Design, High priority, Research'
               className='w-full rounded-xl border border-border px-4 py-3 text-sm outline-none transition placeholder:text-muted/70 focus:border-teal-700 focus:ring-2 focus:ring-teal-700/15'
             />
-            <p className='mt-2 text-xs text-muted'>Separate tags with commas.</p>
+            <p className='mt-2 text-xs text-muted'>
+              Separate tags with commas.
+            </p>
           </div>
 
           <div>
-            <label htmlFor='card-due-date' className='mb-2 block text-sm font-medium'>
-              Due date <span className='font-normal text-muted'>(optional)</span>
+            <label
+              htmlFor='card-due-date'
+              className='mb-2 block text-sm font-medium'
+            >
+              Due date{" "}
+              <span className='font-normal text-muted'>(optional)</span>
             </label>
             <input
               id='card-due-date'
               type='date'
               value={form.dueDate}
-              onChange={(event) => setForm((current) => ({ ...current, dueDate: event.target.value }))}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  dueDate: event.target.value,
+                }))
+              }
               className='w-full rounded-xl border border-border px-4 py-3 text-sm outline-none transition focus:border-teal-700 focus:ring-2 focus:ring-teal-700/15'
             />
           </div>
@@ -166,6 +212,7 @@ export const CardDialog = ({
             </button>
           </div>
         </form>
+        {card && <CardComments cardId={card.id} />}
       </section>
     </div>
   )
