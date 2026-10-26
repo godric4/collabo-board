@@ -1,5 +1,8 @@
 import { create } from "zustand"
 import { createJSONStorage, persist } from "zustand/middleware"
+import { boardApi } from "@/lib/api/board-api"
+import { boardCollaboration } from "@/lib/api/board-collaboration"
+import type { BoardMutation } from "@/lib/api/board-api"
 import type {
   Board,
   BoardCard,
@@ -45,6 +48,7 @@ type BoardStore = BoardState & {
   ) => string | null
   updateComment: (commentId: string, content: string) => void
   deleteComment: (commentId: string) => void
+  applyRemoteMutation: (mutation: BoardMutation) => void
   undo: () => void
   redo: () => void
 }
@@ -296,7 +300,7 @@ export const useBoardStore = create<BoardStore>()(
         if (!title) return null
 
         const id = crypto.randomUUID()
-        let created = false
+        let createdCard: BoardCard | null = null
 
         set((state) => {
           const column = state.columns[columnId]
@@ -312,7 +316,7 @@ export const useBoardStore = create<BoardStore>()(
             dueDate: input.dueDate || null,
           }
 
-          created = true
+          createdCard = card
 
           return withHistory(state, {
             cards: {
@@ -330,7 +334,22 @@ export const useBoardStore = create<BoardStore>()(
           })
         })
 
-        return created ? id : null
+        if (!createdCard) return null
+
+        void boardApi
+          .saveMutation({
+            type: "card.created",
+            card: createdCard,
+            columnId,
+          })
+          .then((result) => {
+            boardCollaboration.publish(result)
+          })
+          .catch((error: unknown) => {
+            console.error("Failed to publish card creation:", error)
+          })
+
+        return id
       },
 
       updateCard: (cardId, updates) => {
@@ -415,6 +434,7 @@ export const useBoardStore = create<BoardStore>()(
           const sourceCardIds = sourceColumn.cardIds.filter(
             (id) => id !== cardId,
           )
+
           const destinationCardIds =
             sourceColumn.id === destinationColumn.id
               ? sourceCardIds
@@ -583,6 +603,34 @@ export const useBoardStore = create<BoardStore>()(
             cards: state.cards,
             comments,
           })
+        })
+      },
+
+      applyRemoteMutation: (mutation) => {
+        if (mutation.type !== "card.created") return
+
+        const { card, columnId } = mutation
+
+        set((state) => {
+          const column = state.columns[columnId]
+
+          if (!column || state.cards[card.id]) return state
+          if (card.columnId !== columnId) return state
+
+          return {
+            ...state,
+            cards: {
+              ...state.cards,
+              [card.id]: card,
+            },
+            columns: {
+              ...state.columns,
+              [columnId]: {
+                ...column,
+                cardIds: [...column.cardIds, card.id],
+              },
+            },
+          }
         })
       },
 
