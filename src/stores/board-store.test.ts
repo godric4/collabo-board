@@ -119,4 +119,94 @@ describe("board store", () => {
 
     expect(useBoardStore.getState().boards[boardId!]).toBeDefined()
   })
+
+  it("handles 20 columns and 200 cards", () => {
+    const boardId = useBoardStore.getState().createBoard("Large project", "")
+
+    expect(boardId).toBeTruthy()
+
+    const columnIds: string[] = []
+
+    for (let index = 0; index < 20; index++) {
+      const columnId = useBoardStore
+        .getState()
+        .createColumn(boardId!, `Column ${index + 1}`)
+
+      expect(columnId).toBeTruthy()
+      columnIds.push(columnId!)
+    }
+
+    for (let index = 0; index < 200; index++) {
+      const columnId = columnIds[index % columnIds.length]
+
+      const cardId = useBoardStore.getState().createCard(columnId, {
+        title: `Card ${index + 1}`,
+      })
+
+      expect(cardId).toBeTruthy()
+    }
+
+    const state = useBoardStore.getState()
+
+    expect(Object.keys(state.columns)).toHaveLength(20)
+    expect(Object.keys(state.cards)).toHaveLength(200)
+
+    const totalCards = Object.values(state.columns).reduce(
+      (total, column) => total + column.cardIds.length,
+      0,
+    )
+
+    expect(totalCards).toBe(200)
+  })
+  it("undoes and redoes a card move", () => {
+    const boardId = useBoardStore.getState().createBoard("Project", "")
+    const firstColumnId = useBoardStore
+      .getState()
+      .createColumn(boardId!, "To do")
+    const secondColumnId = useBoardStore
+      .getState()
+      .createColumn(boardId!, "Done")
+    const cardId = useBoardStore.getState().createCard(firstColumnId!, {
+      title: "Write tests",
+    })
+
+    useBoardStore.getState().moveCard(cardId!, secondColumnId!, 0)
+
+    expect(useBoardStore.getState().cards[cardId!].columnId).toBe(
+      secondColumnId,
+    )
+
+    useBoardStore.getState().undo()
+
+    expect(useBoardStore.getState().cards[cardId!].columnId).toBe(firstColumnId)
+
+    useBoardStore.getState().redo()
+
+    expect(useBoardStore.getState().cards[cardId!].columnId).toBe(
+      secondColumnId,
+    )
+  })
+
+  it("undoes and redoes a card deletion", () => {
+    const boardId = useBoardStore.getState().createBoard("Project", "")
+    const columnId = useBoardStore.getState().createColumn(boardId!, "To do")
+    const cardId = useBoardStore.getState().createCard(columnId!, {
+      title: "Write tests",
+    })
+
+    useBoardStore.getState().deleteCard(cardId!)
+
+    expect(useBoardStore.getState().cards[cardId!]).toBeUndefined()
+
+    useBoardStore.getState().undo()
+
+    expect(useBoardStore.getState().cards[cardId!]).toBeDefined()
+    expect(useBoardStore.getState().columns[columnId!].cardIds).toContain(
+      cardId,
+    )
+
+    useBoardStore.getState().redo()
+
+    expect(useBoardStore.getState().cards[cardId!]).toBeUndefined()
+  })
 })

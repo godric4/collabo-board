@@ -60,11 +60,11 @@ const initialState: BoardState = {
   comments: {},
 }
 
+const historyLimit = 50
+
 const normaliseTags = (tags: string[] = []) => [
   ...new Set(tags.map((tag) => tag.trim()).filter(Boolean)),
 ]
-
-const historyLimit = 50
 
 const snapshot = (state: BoardState): BoardState => ({
   boards: state.boards,
@@ -96,6 +96,48 @@ const removeCommentsForCards = (
       ([, comment]) => !cardIds.has(comment.cardId),
     ),
   )
+
+const removeCommentThread = (
+  comments: Record<string, BoardComment>,
+  commentId: string,
+) => {
+  const deletedIds = new Set([commentId])
+  let foundNewDescendant = true
+
+  while (foundNewDescendant) {
+    foundNewDescendant = false
+
+    Object.values(comments).forEach((comment) => {
+      if (
+        comment.parentId &&
+        deletedIds.has(comment.parentId) &&
+        !deletedIds.has(comment.id)
+      ) {
+        deletedIds.add(comment.id)
+        foundNewDescendant = true
+      }
+    })
+  }
+
+  const nextComments = { ...comments }
+
+  deletedIds.forEach((id) => {
+    delete nextComments[id]
+  })
+
+  return nextComments
+}
+
+const publishMutation = (mutation: BoardMutation) => {
+  void boardApi
+    .saveMutation(mutation)
+    .then((result) => {
+      boardCollaboration.publish(result)
+    })
+    .catch((error: unknown) => {
+      console.error("Failed to publish board mutation:", error)
+    })
+}
 
 export const useBoardStore = create<BoardStore>()(
   persist(
@@ -336,23 +378,18 @@ export const useBoardStore = create<BoardStore>()(
 
         if (!createdCard) return null
 
-        void boardApi
-          .saveMutation({
-            type: "card.created",
-            card: createdCard,
-            columnId,
-          })
-          .then((result) => {
-            boardCollaboration.publish(result)
-          })
-          .catch((error: unknown) => {
-            console.error("Failed to publish card creation:", error)
-          })
+        publishMutation({
+          type: "card.created",
+          card: createdCard,
+          columnId,
+        })
 
         return id
       },
 
       updateCard: (cardId, updates) => {
+        let updatedCard: BoardCard | null = null
+
         set((state) => {
           const card = state.cards[cardId]
 
@@ -363,7 +400,7 @@ export const useBoardStore = create<BoardStore>()(
 
           if (!title) return state
 
-          const updatedCard: BoardCard = {
+          const nextCard: BoardCard = {
             ...card,
             title,
             description:
@@ -380,22 +417,45 @@ export const useBoardStore = create<BoardStore>()(
                 : updates.dueDate || null,
           }
 
+          if (
+            nextCard.title === card.title &&
+            nextCard.description === card.description &&
+            nextCard.dueDate === card.dueDate &&
+            nextCard.tags.length === card.tags.length &&
+            nextCard.tags.every((tag, index) => tag === card.tags[index])
+          ) {
+            return state
+          }
+
+          updatedCard = nextCard
+
           return withHistory(state, {
             cards: {
               ...state.cards,
-              [cardId]: updatedCard,
+              [cardId]: nextCard,
             },
             boards: state.boards,
             columns: state.columns,
           })
         })
+
+        if (!updatedCard) return
+
+        publishMutation({
+          type: "card.updated",
+          card: updatedCard,
+        })
       },
 
       deleteCard: (cardId) => {
+        let deletedColumnId: string | null = null
+
         set((state) => {
           const card = state.cards[cardId]
 
           if (!card) return state
+
+          deletedColumnId = card.columnId
 
           const cards = { ...state.cards }
           delete cards[cardId]
@@ -419,17 +479,31 @@ export const useBoardStore = create<BoardStore>()(
             comments: removeCommentsForCards(state.comments, new Set([cardId])),
           })
         })
+
+        if (!deletedColumnId) return
+
+        publishMutation({
+          type: "card.deleted",
+          cardId,
+          columnId: deletedColumnId,
+        })
       },
 
       moveCard: (cardId, destinationColumnId, destinationIndex) => {
-        let moved = false
+        let movedMutation: BoardMutation | null = null
 
         set((state) => {
           const card = state.cards[cardId]
           const sourceColumn = card ? state.columns[card.columnId] : undefined
           const destinationColumn = state.columns[destinationColumnId]
 
-          if (!card || !sourceColumn || !destinationColumn) return state
+          if (!card || !sourceColumn || !destinationColumn) {
+            return state
+          }
+
+          if (sourceColumn.boardId !== destinationColumn.boardId) {
+            return state
+          }
 
           const sourceCardIds = sourceColumn.cardIds.filter(
             (id) => id !== cardId,
@@ -454,14 +528,19 @@ export const useBoardStore = create<BoardStore>()(
           if (
             sourceColumn.id === destinationColumn.id &&
             sourceColumn.cardIds.every(
-              (existingCardId, index) =>
-                existingCardId === destinationCardIds[index],
+              (existingId, index) => existingId === destinationCardIds[index],
             )
           ) {
             return state
           }
 
-          moved = true
+          movedMutation = {
+            type: "card.moved",
+            cardId,
+            sourceColumnId: sourceColumn.id,
+            destinationColumnId: destinationColumn.id,
+            destinationIndex: insertionIndex,
+          }
 
           const columns =
             sourceColumn.id === destinationColumn.id
@@ -497,7 +576,11 @@ export const useBoardStore = create<BoardStore>()(
           })
         })
 
-        return moved
+        if (!movedMutation) return false
+
+        publishMutation(movedMutation)
+
+        return true
       },
 
       createComment: (cardId, content, parentId = null) => {
@@ -507,7 +590,7 @@ export const useBoardStore = create<BoardStore>()(
 
         const id = crypto.randomUUID()
         const now = new Date().toISOString()
-        let created = false
+        let createdComment: BoardComment | null = null
 
         set((state) => {
           if (!state.cards[cardId]) return state
@@ -515,7 +598,9 @@ export const useBoardStore = create<BoardStore>()(
           if (parentId) {
             const parent = state.comments[parentId]
 
-            if (!parent || parent.cardId !== cardId) return state
+            if (!parent || parent.cardId !== cardId) {
+              return state
+            }
           }
 
           const comment: BoardComment = {
@@ -527,7 +612,7 @@ export const useBoardStore = create<BoardStore>()(
             updatedAt: now,
           }
 
-          created = true
+          createdComment = comment
 
           return withHistory(state, {
             boards: state.boards,
@@ -540,7 +625,14 @@ export const useBoardStore = create<BoardStore>()(
           })
         })
 
-        return created ? id : null
+        if (!createdComment) return null
+
+        publishMutation({
+          type: "comment.created",
+          comment: createdComment,
+        })
+
+        return id
       },
 
       updateComment: (commentId, content) => {
@@ -548,10 +640,20 @@ export const useBoardStore = create<BoardStore>()(
 
         if (!trimmedContent) return
 
+        let updatedComment: BoardComment | null = null
+
         set((state) => {
           const comment = state.comments[commentId]
 
-          if (!comment || comment.content === trimmedContent) return state
+          if (!comment || comment.content === trimmedContent) {
+            return state
+          }
+
+          updatedComment = {
+            ...comment,
+            content: trimmedContent,
+            updatedAt: new Date().toISOString(),
+          }
 
           return withHistory(state, {
             boards: state.boards,
@@ -559,77 +661,244 @@ export const useBoardStore = create<BoardStore>()(
             cards: state.cards,
             comments: {
               ...state.comments,
-              [commentId]: {
-                ...comment,
-                content: trimmedContent,
-                updatedAt: new Date().toISOString(),
-              },
+              [commentId]: updatedComment,
             },
           })
         })
+
+        if (!updatedComment) return
+
+        publishMutation({
+          type: "comment.updated",
+          comment: updatedComment,
+        })
       },
 
+      //
       deleteComment: (commentId) => {
+        const deletedComment = useBoardStore.getState().comments[commentId]
+
+        if (!deletedComment) return
+
         set((state) => {
           if (!state.comments[commentId]) return state
-
-          const deletedIds = new Set([commentId])
-          let foundNewDescendant = true
-
-          while (foundNewDescendant) {
-            foundNewDescendant = false
-
-            Object.values(state.comments).forEach((comment) => {
-              if (
-                comment.parentId &&
-                deletedIds.has(comment.parentId) &&
-                !deletedIds.has(comment.id)
-              ) {
-                deletedIds.add(comment.id)
-                foundNewDescendant = true
-              }
-            })
-          }
-
-          const comments = { ...state.comments }
-
-          deletedIds.forEach((id) => {
-            delete comments[id]
-          })
 
           return withHistory(state, {
             boards: state.boards,
             columns: state.columns,
             cards: state.cards,
-            comments,
+            comments: removeCommentThread(state.comments, commentId),
           })
+        })
+
+        publishMutation({
+          type: "comment.deleted",
+          commentId,
+          cardId: deletedComment.cardId,
         })
       },
 
       applyRemoteMutation: (mutation) => {
-        if (mutation.type !== "card.created") return
-
-        const { card, columnId } = mutation
-
         set((state) => {
-          const column = state.columns[columnId]
+          switch (mutation.type) {
+            case "card.created": {
+              const { card, columnId } = mutation
+              const column = state.columns[columnId]
 
-          if (!column || state.cards[card.id]) return state
-          if (card.columnId !== columnId) return state
+              if (
+                !column ||
+                state.cards[card.id] ||
+                card.columnId !== columnId
+              ) {
+                return state
+              }
 
-          return {
-            ...state,
-            cards: {
-              ...state.cards,
-              [card.id]: card,
-            },
-            columns: {
-              ...state.columns,
-              [columnId]: {
-                ...column,
-                cardIds: [...column.cardIds, card.id],
-              },
-            },
+              return {
+                ...state,
+                cards: {
+                  ...state.cards,
+                  [card.id]: card,
+                },
+                columns: {
+                  ...state.columns,
+                  [columnId]: {
+                    ...column,
+                    cardIds: [...column.cardIds, card.id],
+                  },
+                },
+              }
+            }
+
+            case "card.updated": {
+              const existingCard = state.cards[mutation.card.id]
+
+              if (!existingCard) return state
+
+              return {
+                ...state,
+                cards: {
+                  ...state.cards,
+                  [mutation.card.id]: {
+                    ...existingCard,
+                    ...mutation.card,
+                  },
+                },
+              }
+            }
+
+            case "card.deleted": {
+              const card = state.cards[mutation.cardId]
+
+              if (!card) return state
+
+              const column = state.columns[card.columnId]
+              const cards = { ...state.cards }
+
+              delete cards[mutation.cardId]
+
+              const columns = column
+                ? {
+                    ...state.columns,
+                    [column.id]: {
+                      ...column,
+                      cardIds: column.cardIds.filter(
+                        (id) => id !== mutation.cardId,
+                      ),
+                    },
+                  }
+                : state.columns
+
+              return {
+                ...state,
+                cards,
+                columns,
+                comments: removeCommentsForCards(
+                  state.comments,
+                  new Set([mutation.cardId]),
+                ),
+              }
+            }
+
+            case "card.moved": {
+              const card = state.cards[mutation.cardId]
+
+              if (!card) return state
+
+              const sourceColumn = state.columns[card.columnId]
+              const destinationColumn =
+                state.columns[mutation.destinationColumnId]
+
+              if (!sourceColumn || !destinationColumn) {
+                return state
+              }
+
+              const sourceCardIds = sourceColumn.cardIds.filter(
+                (id) => id !== card.id,
+              )
+
+              const destinationCardIds =
+                sourceColumn.id === destinationColumn.id
+                  ? sourceCardIds
+                  : [...destinationColumn.cardIds]
+
+              const index = Math.min(
+                Math.max(Math.trunc(mutation.destinationIndex), 0),
+                destinationCardIds.length,
+              )
+
+              destinationCardIds.splice(index, 0, card.id)
+
+              const columns =
+                sourceColumn.id === destinationColumn.id
+                  ? {
+                      ...state.columns,
+                      [sourceColumn.id]: {
+                        ...sourceColumn,
+                        cardIds: destinationCardIds,
+                      },
+                    }
+                  : {
+                      ...state.columns,
+                      [sourceColumn.id]: {
+                        ...sourceColumn,
+                        cardIds: sourceCardIds,
+                      },
+                      [destinationColumn.id]: {
+                        ...destinationColumn,
+                        cardIds: destinationCardIds,
+                      },
+                    }
+
+              return {
+                ...state,
+                columns,
+                cards: {
+                  ...state.cards,
+                  [card.id]: {
+                    ...card,
+                    columnId: destinationColumn.id,
+                  },
+                },
+              }
+            }
+
+            case "comment.created": {
+              const comment = mutation.comment
+
+              if (!state.cards[comment.cardId] || state.comments[comment.id]) {
+                return state
+              }
+
+              if (comment.parentId) {
+                const parent = state.comments[comment.parentId]
+
+                if (!parent || parent.cardId !== comment.cardId) {
+                  return state
+                }
+              }
+
+              return {
+                ...state,
+                comments: {
+                  ...state.comments,
+                  [comment.id]: comment,
+                },
+              }
+            }
+
+            case "comment.updated": {
+              const comment = state.comments[mutation.comment.id]
+
+              if (!comment) return state
+
+              return {
+                ...state,
+                comments: {
+                  ...state.comments,
+                  [mutation.comment.id]: {
+                    ...comment,
+                    ...mutation.comment,
+                  },
+                },
+              }
+            }
+
+            case "comment.deleted": {
+              if (!state.comments[mutation.commentId]) {
+                return state
+              }
+
+              return {
+                ...state,
+                comments: removeCommentThread(
+                  state.comments,
+                  mutation.commentId,
+                ),
+              }
+            }
+
+            default:
+              return state
           }
         })
       },
