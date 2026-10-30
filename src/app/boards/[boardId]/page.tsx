@@ -90,7 +90,7 @@ const BoardPage = () => {
   const handleDeleteColumn = async (columnId: string, title: string) => {
     const confirmed = await confirm({
       title: "Delete this column?",
-      message: `"${title}" and all cards inside it will be permanently deleted. This action cannot be undone.`,
+      message: `"${title}" and all cards inside it will be deleted.`,
       confirmLabel: "Delete column",
       cancelLabel: "Keep column",
       destructive: true,
@@ -135,7 +135,7 @@ const BoardPage = () => {
   const handleDeleteCard = async (cardId: string, title: string) => {
     const confirmed = await confirm({
       title: "Delete this card?",
-      message: `"${title}" will be permanently deleted. This action cannot be undone.`,
+      message: `"${title}" will be deleted.`,
       confirmLabel: "Delete card",
       cancelLabel: "Keep card",
       destructive: true,

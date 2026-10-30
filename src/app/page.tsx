@@ -13,10 +13,10 @@ import { useAlerts } from "@/components/ui/alert-provider"
 import { useBoardStore } from "@/stores/board-store"
 
 const noteColors = [
+  "bg-note-green",
+  "bg-note-blue",
   "bg-note-yellow",
   "bg-note-pink",
-  "bg-note-blue",
-  "bg-note-green",
 ]
 
 const Page = () => {
@@ -156,7 +156,7 @@ const Page = () => {
   const handleDeleteBoard = async (boardId: string, boardTitle: string) => {
     const confirmed = await confirm({
       title: "Delete this board?",
-      message: `"${boardTitle}" and all its columns and cards will be permanently deleted. This action cannot be undone.`,
+      message: `"${boardTitle}" and all its columns and cards will be deleted.`,
       confirmLabel: "Delete board",
       cancelLabel: "Keep board",
       destructive: true,
