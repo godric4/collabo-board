@@ -788,7 +788,12 @@ export const useBoardStore = create<BoardStore>()(
               const destinationColumn =
                 state.columns[mutation.destinationColumnId]
 
-              if (!sourceColumn || !destinationColumn) {
+              if (
+                !sourceColumn ||
+                !destinationColumn ||
+                sourceColumn.id !== mutation.sourceColumnId ||
+                sourceColumn.boardId !== destinationColumn.boardId
+              ) {
                 return state
               }
 
